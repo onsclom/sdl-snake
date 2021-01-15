@@ -2,14 +2,18 @@
 #include <time.h>
 #include <SDL2/SDL.h>
 
-#define WIDTH 1000
-#define HEIGHT 800
-#define SQUARESIZE 20
+#define WIDTH 96
+#define HEIGHT 54
+#define SQUARESIZE 1
+#define SCALE 10
 
 #define GIMMICK 0
 #define AI 1
 
+#define FRAMETIME 25
+
 int moveTick = 0;
+int fullscreen = 0;
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -49,7 +53,8 @@ init()
 		return 3;
 	}
 
-	if(SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &window, &renderer)) {
+	if(SDL_CreateWindowAndRenderer(
+			 WIDTH * SCALE, HEIGHT * SCALE, 0, &window, &renderer)) {
 		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
 			"Couldn't create window and renderer: %s",
 			SDL_GetError());
@@ -121,16 +126,18 @@ AI_update()
 			int hittingBody = existsBody(snake.position.x + possibleMoves[i].x,
 				snake.position.y + possibleMoves[i].y);
 
-			if(!hittingBody) {
+			if(!hittingBody && snake.position.x + possibleMoves[i].x >= 0 &&
+				 snake.position.y + possibleMoves[i].y >= 0 &&
+				 snake.position.x + possibleMoves[i].x < WIDTH / SQUARESIZE &&
+				 snake.position.y + possibleMoves[i].y < HEIGHT / SQUARESIZE) {
 				legalMoves[legalMoveAmount] = possibleMoves[i];
 				legalMoveAmount++;
 			}
 		}
 
-		printf("legal move amount: %d on tick: %d\n", legalMoveAmount, moveTick);
 		if(legalMoveAmount) {
-
-			snake.velocity = possibleMoves[0];
+			int choice = rand() % legalMoveAmount;
+			snake.velocity = legalMoves[choice];
 		}
 	}
 }
@@ -179,7 +186,6 @@ update()
 	if(existsBody(snake.position.x, snake.position.y)) {
 		snake.bodyAmount = 0;
 		printf("died!\n");
-		printf("moveTick died: %d\n", moveTick);
 	}
 }
 
@@ -242,9 +248,22 @@ main()
 					snake.velocity.x = -1;
 					snake.velocity.y = 0;
 					break;
-				case SDLK_d: snake.velocity.x = 1; snake.velocity.y = 0;
+				case SDLK_d:
+					snake.velocity.x = 1;
+					snake.velocity.y = 0;
+					break;
+				case SDLK_f:
+					fullscreen = fullscreen ? 0 : 1;
+					SDL_SetWindowFullscreen(
+						window, fullscreen ? SDL_WINDOW_FULLSCREEN : 0);
+					break;
+				case SDLK_m:
+					SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING,
+						"Hello world!",
+						"This is interesting huh",
+						NULL);
+					break;
 				}
-				break;
 			}
 		}
 
@@ -252,14 +271,34 @@ main()
 
 		draw();
 
-		SDL_SetWindowPosition(window, windowx, windowy);
+		int renderW, renderH;
+		SDL_GetRendererOutputSize(renderer, &renderW, &renderH);
+
+		/*
+		SDL_SetWindowSize(window, renderW, renderH);
+		*/
+
+		SDL_RenderSetScale(
+			renderer, (float)renderW / (float)WIDTH, (float)renderH / (float)HEIGHT);
+
+		SDL_Rect rect = {0, 0, WIDTH, HEIGHT};
+		SDL_RenderSetViewport(renderer, &rect);
+
+		if(GIMMICK) {
+			SDL_SetWindowPosition(window, windowx, windowy);
+		}
 		SDL_RenderPresent(renderer);
 
 		if(running) {
-			SDL_Delay(100 - (SDL_GetTicks() - start));
+			int time = SDL_GetTicks() - start;
+
+			int waitTime = FRAMETIME - time;
+			if(waitTime < 19 || waitTime > 30)
+				printf("wait time: %d\n", waitTime);
+			if(waitTime > 0)
+				SDL_Delay(waitTime);
 		}
 	}
 
-	printf("testing!");
 	return 0;
 }
